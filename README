@@ -1,0 +1,25 @@
+BOOTIE, A RUDIMENTARY BOOTLOADER FOR COMPUTATIONAL RFIDS
+Author: Ben Ransford <ransford@cs.umass.edu>, April 2010
+
+QUICK START:
+ 1. Put your standalone programs (i.e., programs that have their own main()
+    functions) in the firmwares/ subdirectory.
+ 2. Install LLVM, Clang, and mspgcc4 following the instructions at
+    https://github.com/ransford/mementos/wiki/Building-and-installing.
+ 3. cd llvm
+    ./configure
+    make
+    make install # may require root
+    cd ..
+ 4. ./configure
+    make
+ 5. You will see an MSP430 ELF executable called 'bootloader'.
+
+This version of Bootie simply rotates among firmware images on successive boots
+of the device.  The included programs a.c and b.c (in firmwares/) serve as
+examples.  For now, input programs like a.c and b.c are not allowed to contain
+interrupt handlers or share function names (except main(), which will be
+renamed at build time).
+
+To use programs other than firmwares/a.c and b.c, make your own subdirectory,
+e.g. myfirmwares/, and run 'make FWDIR=myfirmwares' in step 4 above.
