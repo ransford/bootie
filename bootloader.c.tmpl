@@ -1,0 +1,66 @@
+#ifdef __MSP430_2132__
+#include <msp430x21x2.h>
+#else
+#include <msp430x21x1.h>
+#endif
+
+/* The nonvolatile "switch" that directs this bootloader to one of N firmware
+ * options is located at the last word of infomem segment C, 0x10BE on an
+ * MSP430F2131/F2132. */
+#define _FIRMWARE_SWITCH_ADDRESS 0x10BE
+static unsigned int* FIRMWARE_SWITCH =
+    (unsigned int*)_FIRMWARE_SWITCH_ADDRESS;
+
+extern int @@MAIN_FUNCTIONS@@;
+void cleanup (void);
+
+typedef int (*mainfn)(void);
+@@MAIN_ARRAY@@
+
+int main (void) {
+    mainfn fn, nextfn;
+    unsigned int i;
+    unsigned int foundfw = 27;
+
+    /* does the FIRMWARE_SWITCH point to one of our main functions? */
+    for (i = 0; i < @@NUM_MAIN_FUNCTIONS@@; ++i)
+        if (mainfns[i] == (mainfn)(*FIRMWARE_SWITCH))
+            foundfw = 1;
+    if (foundfw == 27) {
+        FCTL3 = FWKEY;
+        FCTL1 = FWKEY + WRT;
+        *FIRMWARE_SWITCH = (unsigned int)&@@DEFAULT_MAIN_FUNCTION@@;
+        FCTL1 = FWKEY;
+        FCTL3 = FWKEY + LOCK;
+    }
+
+    /* at this point, *FIRMWARE_SWITCH should point to one of the main functions
+     * from the mainfns[] array*/
+    fn = (mainfn)(*FIRMWARE_SWITCH);
+
+    for (i = 0; i < @@NUM_MAIN_FUNCTIONS@@; ++i)
+        if (mainfns[i] == fn)
+            nextfn = mainfns[(i + 1) % @@NUM_MAIN_FUNCTIONS@@];
+
+    (fn)();
+    cleanup();
+
+    FCTL3 = FWKEY;
+    FCTL1 = FWKEY + ERASE;
+    *FIRMWARE_SWITCH = 0;
+    FCTL1 = FWKEY + WRT;
+    *FIRMWARE_SWITCH = (unsigned int)nextfn;
+    FCTL1 = FWKEY;
+    FCTL3 = FWKEY + LOCK;
+
+    __bis_SR_register(CPUOFF); // turn off the CPU
+    return 0; // actually won't happen; here to prevent compiler complaint
+}
+
+void cleanup (void) {
+#ifdef __MSP430_2132__
+    P3OUT = 0;
+#else
+    P1OUT = 0;
+#endif
+}

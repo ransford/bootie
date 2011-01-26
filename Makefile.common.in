@@ -1,0 +1,36 @@
+.SUFFIXES: .c .o .s .bc
+
+LLVM = @LLVMPREFIX@
+MSPGCC = @MSPGCCPREFIX@
+MSPSIM = @MSPSIMPREFIX@
+
+# toolchain elements
+MCC=$(MSPGCC)/bin/msp430-gcc
+MCLIBS=
+CC=$(LLVM)/bin/clang
+LLC=$(LLVM)/bin/llc -march=msp430 -combiner-alias-analysis
+OPT=$(LLVM)/bin/opt -debug -stats
+
+# chip to target (unless already defined)
+MCU ?= msp430x2131
+MCUDEF = $(shell echo "$(MCU)" | sed -e 's/^/__/; s/$$/__/; s/x/_/' | tr a-z A-Z)
+
+# compiler flags
+override CFLAGS+=-I$(PWD)/include -I$(MSPGCC)/msp430/include -D$(MCUDEF) -O0 -emit-llvm -ccc-host-triple msp430-elf
+override MCFLAGS+=-I$(PWD)/include -mmcu=$(MCU)
+
+# OS-specific options
+OS=$(shell uname -s)
+ifeq ($(OS),Darwin)
+ LIBEXT=dylib
+else
+ LIBEXT=so
+endif
+BOOTIELIB=$(LLVM)/lib/libBootie.$(LIBEXT)
+
+# optimization passes common to all flavors
+OPT_RMAIN=$(OPT) -load $(BOOTIELIB) \
+	-bootie-rename-main -bootie-name-main-after-module
+
+%-main-renamed.o: %.o
+	$(OPT_RMAIN) -o $@ $<
